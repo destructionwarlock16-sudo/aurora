@@ -134,7 +134,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         response = await client.chat.completions.create(
-            model="grok-beta-latest",
+            model="grok-4-1-fast-reasoning",
             messages=messages,
             temperature=0.85,
             max_tokens=150,
