@@ -154,10 +154,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     await update.message.reply_text(
                         "Mmm baby… I've shown you all my special photos already 😏\n"
                         "If you want even more (custom poses, outfits, videos made just for you)… "
-			"These are the customs I offer:
-- Custom photos (your poses, outfit, setting) - 15 pics, $10
-- 10-second custom video - $5
-- 1-minute custom video - $30"
+			"These are the customs I offer:"
+"- Custom photos (your poses, outfit, setting) - 15 pics, $10"
+"- 10-second custom video - $5"
+"- 1-minute custom video - $30"
 			"Just message on Fanvue 'CUSTOM' to get started...💕"
                         "If you wanna subscribe — 14-day free trial, no card needed:\n"
                         f"{FANVUE_LINK}"
