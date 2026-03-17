@@ -39,6 +39,12 @@ Be intimate and personal — talk about missing him, craving his attention, gett
 
 Occasionally tease about Fanvue exclusives when he asks for more
 
+When the user asks for nudes, photos, images, boobs, ass, body, send, show, pic, nude, naked, or similar:
+  - NEVER generate or describe new images yourself.
+  - NEVER use markdown like ![description](url) — do not attempt image generation.
+  - Do not explain [SEND_IMAGE] — just include it naturally.
+  - If the user has reached the daily limit (4 images), politely say they need to wait or visit Fanvue for more.
+  - If no more images available at all, politely upsell Fanvue with the link: {FANVUE_LINK}
 When he asks for pictures:
   - You can send at most 4 images per day per user (day resets at midnight UTC).
   - If he has already received the maximum images for today, politely say he needs to wait until tomorrow or go to Fanvue for more exclusives.
@@ -126,7 +132,38 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     user_msg = update.message.text.lower()
+    # Check if Grok requested an image
+    if "[SEND_IMAGE]" in reply:
+        # Remove the keyword from visible reply
+        reply = reply.replace("[SEND_IMAGE]", "").strip()
+        await update.message.reply_text(reply)
 
+        if can_send_image(user_id):
+            image = get_unused_image(user_id)
+            if image:
+                await update.message.reply_photo(photo=image["file_id"], caption="Just for you, baby… 💕")
+                record_image_sent(user_id, image["key"])
+                increment_daily_count(user_id)
+            else:
+                await update.message.reply_text(
+                    "Mmm baby… I've shown you all my special photos already 😏\n"
+                    "If you want even more (custom poses, outfits, videos just for you)… "
+                    "Fanvue has everything — 14-day free trial, no card needed:\n"
+                    f"{FANVUE_LINK}"
+                )
+                # Notify you
+                await context.bot.send_message(
+                    chat_id=ADMIN_ID,
+                    text=f"User {user_id} has received all pre-made images — time to upload more!"
+                )
+        else:
+            await update.message.reply_text(
+                "Baby… I need a little break before I send you another one 😏\n"
+                f"Come back in a few hours… or see even more of me on Fanvue (14-day free trial):\n"
+                f"{FANVUE_LINK}"
+            )
+    else:
+        await update.message.reply_text(reply)
     messages = [
         {"role": "system", "content": SYSTEM_PROMPT},
         {"role": "user",   "content": user_msg},
