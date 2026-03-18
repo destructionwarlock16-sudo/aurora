@@ -8,12 +8,18 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 from openai import AsyncOpenAI
 
 # === CHANGE THESE ===
-TELEGRAM_TOKEN = "YOUR_TELEGRAM_BOT_TOKEN_HERE"
-GROK_API_KEY   = "xai-YOUR_API_KEY_HERE"
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
+GROK_API_KEY   = os.getenv("GROK_API_KEY")
 FANVUE_LINK    = "https://www.fanvue.com/aurora-valencia/fv-1"
 ADMIN_ID       = 8548080791                           # your Telegram user ID
 GITHUB_USERNAME = "destructionwarlock16-sudo"              # ← change
 GITHUB_REPO     = "aurora"                    # ← change
+
+if not TELEGRAM_TOKEN or not GROK_API_KEY:
+    print("Error: TELEGRAM_TOKEN or GROK_API_KEY not set in environment variables!")
+    exit(1)
+
+print("Tokens loaded from environment variables.")
 
 # List your image filenames here (exact names from the 'images' folder in repo)
 IMAGE_FILENAMES = [
