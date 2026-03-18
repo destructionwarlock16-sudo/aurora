@@ -8,8 +8,8 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 from openai import AsyncOpenAI
 
 # === CHANGE THESE ===
-TELEGRAM_TOKEN = 
-GROK_API_KEY   = 
+TELEGRAM_TOKEN = "YOUR_TELEGRAM_BOT_TOKEN_HERE"
+GROK_API_KEY   = "xai-YOUR_API_KEY_HERE"
 FANVUE_LINK    = "https://www.fanvue.com/aurora-valencia/fv-1"
 ADMIN_ID       = 8548080791                           # your Telegram user ID
 GITHUB_USERNAME = "destructionwarlock16-sudo"              # ← change
