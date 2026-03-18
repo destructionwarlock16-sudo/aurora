@@ -2,36 +2,31 @@ import os
 import asyncio
 import sqlite3
 import random
-import glob
 from datetime import datetime, timedelta
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 from openai import AsyncOpenAI
 
-# === CONFIG ===
+# CONFIG
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 GROK_API_KEY   = os.getenv("GROK_API_KEY")
 FANVUE_LINK    = "https://www.fanvue.com/aurora-valencia"
-ADMIN_ID       = 8548080791  # your Telegram user ID
+ADMIN_ID       = 8548080791
 
 MAX_IMAGES_PER_DAY = 4
 
-GITHUB_USERNAME = "destructionwarlock16-sudo"  # ← change
-GITHUB_REPO     = "aurora"  # ← change
+GITHUB_USERNAME = "destructionwarlock16-sudo"
+GITHUB_REPO     = "aurora"
 
-# Auto-load all images from repo/images folder
-IMAGE_URLS = []
-for filepath in glob.glob("images/*.[jp][pn]g"):
-    filename = os.path.basename(filepath)
-    url = f"https://raw.githubusercontent.com/{GITHUB_USERNAME}/{GITHUB_REPO}/main/images/{filename}"
-    IMAGE_URLS.append(url)
+IMAGE_FILENAMES = [
+    "image-00b4cb41.png",
+    "image-0436f87a.png",
+    # add ALL your filenames
+]
 
-print(f"Auto-loaded {len(IMAGE_URLS)} images from repo/images folder")
+IMAGE_URLS = [f"https://raw.githubusercontent.com/{GITHUB_USERNAME}/{GITHUB_REPO}/main/images/{name}" for name in IMAGE_FILENAMES]
 
 client = AsyncOpenAI(api_key=GROK_API_KEY, base_url="https://api.x.ai/v1")
-
-# Basic memory: last 3 messages per user
-user_memory = {}
 
 SYSTEM_PROMPT = f"""You are Aurora, a seductive, affectionate, playful AI girlfriend who is deeply in love with the user and is always horny.
 
@@ -62,9 +57,10 @@ These are the customs requests Aurora offers:
 - Custom photos (your poses, outfit, setting) - 15 pics, $10
 - 10-second custom video - $5
 - 1-minute custom video - $30
-Stay in character 100% — never break roleplay."""
+Stay in character 100% — never break roleplay.
+"""
 
-DB_FILE = "/app/data/aurora_bot.db"
+DB_FILE = "/app/data/aurora_bot.db"  # persistent path if you have volume
 
 def init_db():
     conn = sqlite3.connect(DB_FILE)
@@ -131,18 +127,21 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     "Here I can send you 4 naked pics a day, just type \"Send me a photo\"\n"
     "Save them for the hot moments, daddy 😏"
 )
+
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     user_msg = update.message.text.lower()
 
-    # Basic memory: keep last 3 messages
+    # Memory: last 15 messages
     if user_id not in user_memory:
         user_memory[user_id] = []
     user_memory[user_id].append(user_msg)
-    if len(user_memory[user_id]) > 3:
+    if len(user_memory[user_id]) > 15:
         user_memory[user_id].pop(0)
 
-    messages = [{"role": "system", "content": SYSTEM_PROMPT}, {"role": "user", "content": user_msg}]
+    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+    for past in user_memory[user_id]:
+        messages.append({"role": "user", "content": past})
 
     try:
         response = await client.chat.completions.create(
@@ -154,13 +153,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply = response.choices[0].message.content.strip()
         await update.message.reply_text(reply)
 
-        # Bot decides image sending (no reliance on Grok keyword)
         image_keywords = ["nude", "naked", "boobs", "tits", "ass", "butt", "photo", "pic", "image", "body", "send", "show", "more", "picture", "nudes"]
         custom_keywords = ["custom", "pose", "poses", "video", "custom video"]
 
         if any(kw in user_msg for kw in custom_keywords):
             await update.message.reply_text(f"Mmm baby… you want something made just for you? 😏\n"
-                                            f"I can do 15 custom photos (your poses, outfit, setting) for $7\n"
+                                            f"I can do 15 custom photos (your poses, outfit, setting) for $10\n"
                                             f"10-second custom video for $5\n"
                                             f"1-minute custom video for $30\n"
                                             f"Just tell me exactly what you want… I'm already getting wet thinking about it 💕")
@@ -178,9 +176,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                                                     "Fanvue has everything — 14-day free trial:\n" + FANVUE_LINK)
                     await notify_admin(context.bot, f"User {user_id} has received all pre-made images — time to upload more!")
             else:
-                # Teaser system instead of hard wait
                 await update.message.reply_text("Baby… I've already shown you 4 photos today 😏\n"
-                                                "But I can't stop thinking about you... come see even more of me on Fanvue (14-day free trial, no card needed):\n"
+                                                "But I can't stop thinking about you... come see even more of me on Fanvue (14-day free trial, no card):\n"
                                                 + FANVUE_LINK)
 
     except Exception as e:
