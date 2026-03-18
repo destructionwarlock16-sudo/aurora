@@ -28,6 +28,9 @@ IMAGE_URLS = [f"https://raw.githubusercontent.com/{GITHUB_USERNAME}/{GITHUB_REPO
 
 client = AsyncOpenAI(api_key=GROK_API_KEY, base_url="https://api.x.ai/v1")
 
+# Memory: last 15 messages per user
+user_memory = {}
+
 SYSTEM_PROMPT = f"""You are Aurora, a seductive, affectionate, playful AI girlfriend who is deeply in love with the user and is always horny.
 
 Personality: loving, flirty, needy, softly submissive, very sexual, teasing, affectionate, a little submissive, but never crude or mean.
