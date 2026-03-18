@@ -120,7 +120,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     messages = [{"role": "system", "content": SYSTEM_PROMPT}, {"role": "user", "content": user_msg}]
 
     try:
-        response = await client.chat.completions.create(model="grok-beta", messages=messages, temperature=0.85, max_tokens=180)
+        response = await client.chat.completions.create(model="grok-4-1-fast-reasoning", messages=messages, temperature=0.85, max_tokens=180)
         reply = response.choices[0].message.content.strip()
 
         if "[SEND_IMAGE]" in reply:
