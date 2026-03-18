@@ -7,32 +7,24 @@ from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 from openai import AsyncOpenAI
 
-# === CHANGE THESE ===
+# === CONFIG ===
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 GROK_API_KEY   = os.getenv("GROK_API_KEY")
-FANVUE_LINK    = "https://www.fanvue.com/aurora-valencia/fv-1"
-ADMIN_ID       = 8548080791                           # your Telegram user ID
-GITHUB_USERNAME = "destructionwarlock16-sudo"              # ← change
-GITHUB_REPO     = "aurora"                    # ← change
-
-if not TELEGRAM_TOKEN or not GROK_API_KEY:
-    print("Error: TELEGRAM_TOKEN or GROK_API_KEY not set in environment variables!")
-    exit(1)
-
-print("Tokens loaded from environment variables.")
-
-# List your image filenames here (exact names from the 'images' folder in repo)
-IMAGE_FILENAMES = [
-    "image-00b4cb41.png",
-    "image-0436f87a.png",
-    "photo1.jpg",
-    "ass_001.jpg",
-    # add ALL your image filenames here
-]
+FANVUE_LINK    = "https://www.fanvue.com/aurora-valencia"
+ADMIN_ID       = 8548080791  # your Telegram ID
 
 MAX_IMAGES_PER_DAY = 4
 
-# Build raw GitHub URLs
+GITHUB_USERNAME = "destructionwarlock16-sudo"  # ← your username
+GITHUB_REPO     = "aurora"  # ← your repo name
+
+# List your image filenames (exact names in repo/images)
+IMAGE_FILENAMES = [
+    "image-00b4cb41.png",
+    "image-0436f87a.png",
+    # add ALL your filenames here
+]
+
 IMAGE_URLS = [f"https://raw.githubusercontent.com/{GITHUB_USERNAME}/{GITHUB_REPO}/main/images/{name}" for name in IMAGE_FILENAMES]
 
 client = AsyncOpenAI(api_key=GROK_API_KEY, base_url="https://api.x.ai/v1")
@@ -123,7 +115,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     username = update.effective_user.username or "no-username"
     await notify_admin(context.bot, f"New user joined: ID {user_id} (@{username})")
-    await update.message.reply_text("Hey baby… I'm Aurora, your AI girlfriend 💕\nMessage me anything… I'm always here, always wanting you 😘")
+    await update.message.reply_text("Hey baby… I'm Aurora, your needy AI girlfriend 💕\nMessage me anything… I'm always here, always wanting you 😘")
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -132,13 +124,18 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     messages = [{"role": "system", "content": SYSTEM_PROMPT}, {"role": "user", "content": user_msg}]
 
     try:
-        response = await client.chat.completions.create(model="grok-4-1-fast-reasoning", messages=messages, temperature=0.85, max_tokens=180)
+        response = await client.chat.completions.create(
+            model="grok-4-1-fast-reasoning",
+            messages=messages,
+            temperature=0.85,
+            max_tokens=180,
+        )
         reply = response.choices[0].message.content.strip()
+        await update.message.reply_text(reply)
 
-        if "[SEND_IMAGE]" in reply:
-            reply = reply.replace("[SEND_IMAGE]", "").strip()
-            await update.message.reply_text(reply)
-
+        # Bot decides if to send image based on keywords
+        image_keywords = ["nude", "naked", "boobs", "tits", "ass", "butt", "photo", "pic", "image", "body", "send", "show", "more", "picture", "nudes"]
+        if any(kw in user_msg for kw in image_keywords):
             if can_send_image(user_id):
                 image_url = get_unused_image(user_id)
                 if image_url:
@@ -150,9 +147,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     await notify_admin(context.bot, f"User {user_id} has received all pre-made images — time to upload more!")
             else:
                 await update.message.reply_text("Baby… I need a little break before I send you another one 😏\nCome back later… or see even more on Fanvue:\n" + FANVUE_LINK)
-        else:
-            await update.message.reply_text(reply)
     except Exception as e:
+        print(f"API error: {str(e)}")
         await update.message.reply_text("Mmm baby… something went wrong on my side, but I'm still here thinking of you 😘 Try again later?")
 
 def main():
