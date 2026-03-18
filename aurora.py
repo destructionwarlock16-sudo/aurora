@@ -166,7 +166,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             messages.append({"role": "user", "content": "User just received a photo - reply seductively"})
             try:
                 response = await client.chat.completions.create(
-                    model="grok-4-1-fast-reasoning",
+                    model="grok",
                     messages=messages,
                     temperature=0.85,
                     max_tokens=100,
