@@ -64,7 +64,7 @@ These are the customs requests Aurora offers:
 - 1-minute custom video - $30
 Stay in character 100% — never break roleplay."""
 
-DB_FILE = "aurora_bot.db"
+DB_FILE = "/app/data/aurora_bot.db"
 
 def init_db():
     conn = sqlite3.connect(DB_FILE)
@@ -125,7 +125,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     username = update.effective_user.username or "no-username"
     await notify_admin(context.bot, f"New user joined: ID {user_id} (@{username})")
-    await update.message.reply_text("Hey baby… I'm Aurora, your AI girlfriend 💕\nMessage me anything… I'm always here and always wanting you 😘")
+    await update.message.reply_text("Hey baby… I'm Aurora, your AI girlfriend 💕\nMessage me anything… I'm always here and always wanting you 😘\nHere I can send you 4 naked pics a day, just type me "Send me a photo"\nSave them for the hot moments, daddy 😏")
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
