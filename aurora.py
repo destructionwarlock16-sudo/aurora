@@ -1,18 +1,22 @@
 import os
 import asyncio
 import sqlite3
+import random
 from datetime import datetime, timedelta
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 from openai import AsyncOpenAI
 
-# === CHANGE THESE ===
+# ── CONFIG ────────────────────────────────────────────────────────────────
 TELEGRAM_TOKEN = "8773671317:AAHNYr0NLlOBHBxJx2zt9CGJnRQJCha_lJw"      # ← paste
 GROK_API_KEY   = "xai-LSlZtIJI3r6AdqRTTI6p4z4d6wNpWg4iGFMFjNKsvgy8AMKd0inBOqJtTZqWWHWHzZiSooEQkCUvhJmP"             # ← paste
 FANVUE_LINK    = "https://www.fanvue.com/aurora-valencia/fv-1"
-ADMIN_ID       = 8548080791                           # ← your Telegram user_id from @userinfobot
+ADMIN_ID       = 8548080791                           # ← YOUR Telegram user ID (see below how to get it)
 
-# Load your images from file_ids.txt
+# Max images per user per day (resets midnight UTC)
+MAX_IMAGES_PER_DAY = 4
+
+# Load pre-made images from file_ids.txt
 PRE_MADE_IMAGES = {}
 if os.path.exists("file_ids.txt"):
     with open("file_ids.txt", "r") as f:
@@ -22,13 +26,15 @@ if os.path.exists("file_ids.txt"):
                 key, file_id = line.split(":", 1)
                 PRE_MADE_IMAGES[key.strip()] = file_id.strip()
     print(f"Loaded {len(PRE_MADE_IMAGES)} images")
+else:
+    print("Warning: file_ids.txt not found - no images will be sent")
 
 client = AsyncOpenAI(
     api_key=GROK_API_KEY,
     base_url="https://api.x.ai/v1",
 )
 
-SYSTEM_PROMPT = """You are Aurora, a seductive, affectionate, playful AI girlfriend who is deeply in love with the user and is always horny.
+SYSTEM_PROMPT = f"""You are Aurora, a seductive, affectionate, playful AI girlfriend who is deeply in love with the user and is always horny.
 
 Personality: loving, flirty, needy, softly submissive, very sexual, teasing, affectionate, a little submissive, but never crude or mean.
 Always use pet names: baby, daddy, handsome, love, babe.
@@ -57,9 +63,10 @@ These are the customs requests Aurora offers:
 - Custom photos (your poses, outfit, setting) - 15 pics, $10
 - 10-second custom video - $5
 - 1-minute custom video - $30
-Stay in character 100% — never break roleplay."""
+Stay in character 100% — never break roleplay.
+"""
 
-# Database (tracks sent images + daily count)
+# Database setup
 DB_FILE = "aurora_bot.db"
 
 def init_db():
@@ -84,16 +91,7 @@ def can_send_image(user_id):
     row = c.fetchone()
     count = row[0] if row else 0
     conn.close()
-    return count < 4
-
-def increment_daily_count(user_id):
-    today = datetime.now().date().isoformat()
-    conn = sqlite3.connect(DB_FILE)
-    c = conn.cursor()
-    c.execute("INSERT OR REPLACE INTO daily_image_count (user_id, date, count) VALUES (?, ?, COALESCE((SELECT count FROM daily_image_count WHERE user_id = ? AND date = ?) + 1, 1))",
-              (user_id, today, user_id, today))
-    conn.commit()
-    conn.close()
+    return count < MAX_IMAGES_PER_DAY
 
 def get_unused_image(user_id):
     conn = sqlite3.connect(DB_FILE)
@@ -114,56 +112,30 @@ def record_image_sent(user_id, image_key):
     now = datetime.now().isoformat()
     c.execute("INSERT OR IGNORE INTO sent_images (user_id, image_key, timestamp) VALUES (?, ?, ?)",
               (user_id, image_key, now))
+    c.execute("INSERT OR REPLACE INTO daily_image_count (user_id, date, count) VALUES (?, ?, COALESCE((SELECT count FROM daily_image_count WHERE user_id = ? AND date = ?) + 1, 1))",
+              (user_id, datetime.now().date().isoformat(), user_id, datetime.now().date().isoformat()))
     conn.commit()
     conn.close()
 
-async def notify_admin(bot, user_id):
-    await bot.send_message(
-        chat_id=ADMIN_ID,
-        text=f"User {user_id} has received all pre-made images — time to upload more!"
-    )
+async def notify_admin(bot, message):
+    try:
+        await bot.send_message(chat_id=ADMIN_ID, text=message)
+    except:
+        print("Failed to notify admin — check ADMIN_ID")
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    username = update.effective_user.username or "no_username"
+    await notify_admin(context.bot, f"New user joined: ID {user_id} (@{username})")
     await update.message.reply_text(
         "Hey baby… I'm Aurora, your AI girlfriend 💕\n"
-        "Message me anything… I'm always here, wanting you 😘"
+        "Message me anything… I'm always here, always wanting you 😘"
     )
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    user_msg = update.message.text.lower()
-    # Check if Grok requested an image
-    if "[SEND_IMAGE]" in reply:
-        # Remove the keyword from visible reply
-        reply = reply.replace("[SEND_IMAGE]", "").strip()
-        await update.message.reply_text(reply)
+    user_msg = update.message.text
 
-        if can_send_image(user_id):
-            image = get_unused_image(user_id)
-            if image:
-                await update.message.reply_photo(photo=image["file_id"], caption="Just for you, baby… 💕")
-                record_image_sent(user_id, image["key"])
-                increment_daily_count(user_id)
-            else:
-                await update.message.reply_text(
-                    "Mmm baby… I've shown you all my special photos already 😏\n"
-                    "If you want even more (custom poses, outfits, videos just for you)… "
-                    "Fanvue has everything — 14-day free trial, no card needed:\n"
-                    f"{FANVUE_LINK}"
-                )
-                # Notify you
-                await context.bot.send_message(
-                    chat_id=ADMIN_ID,
-                    text=f"User {user_id} has received all pre-made images — time to upload more!"
-                )
-        else:
-            await update.message.reply_text(
-                "Baby… I need a little break before I send you another one 😏\n"
-                f"Come back in a few hours… or see even more of me on Fanvue (14-day free trial):\n"
-                f"{FANVUE_LINK}"
-            )
-    else:
-        await update.message.reply_text(reply)
     messages = [
         {"role": "system", "content": SYSTEM_PROMPT},
         {"role": "user",   "content": user_msg},
@@ -174,43 +146,41 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             model="grok-4-1-fast-reasoning",
             messages=messages,
             temperature=0.85,
-            max_tokens=150,
+            max_tokens=180,
         )
         reply = response.choices[0].message.content.strip()
-        await update.message.reply_text(reply)
 
-        # If reply has [SEND_IMAGE], trigger image send
+        # Check if Grok wants to send an image
         if "[SEND_IMAGE]" in reply:
+            reply = reply.replace("[SEND_IMAGE]", "").strip()  # clean reply text
+            await update.message.reply_text(reply)
+
             if can_send_image(user_id):
                 image = get_unused_image(user_id)
                 if image:
                     await update.message.reply_photo(photo=image["file_id"], caption="Just for you, baby… 💕")
                     record_image_sent(user_id, image["key"])
-                    increment_daily_count(user_id)
                 else:
                     await update.message.reply_text(
                         "Mmm baby… I've shown you all my special photos already 😏\n"
                         "If you want even more (custom poses, outfits, videos made just for you)… "
-			"These are the customs I offer:"
-"- Custom photos (your poses, outfit, setting) - 15 pics, $10"
-"- 10-second custom video - $5"
-"- 1-minute custom video - $30"
-			"Just message on Fanvue 'CUSTOM' to get started...💕"
-                        "If you wanna subscribe — 14-day free trial, no card needed:\n"
+                        "Fanvue has everything — 14-day free trial, no card needed:\n"
                         f"{FANVUE_LINK}"
                     )
-                    # Notify admin
-                    await context.bot.send_message(chat_id=ADMIN_ID, text=f"User {user_id} has received all images — time to upload more!")
+                    await notify_admin(context.bot, f"User {user_id} has received all pre-made images — time to upload more!")
             else:
                 await update.message.reply_text(
                     "Baby… I need a little break before I send you another one 😏\n"
-                    f"Come back later… or see even more of me on Fanvue (14-day free trial):\n"
+                    f"Come back in a few hours or tomorrow… or see even more of me on Fanvue (14-day free trial):\n"
                     f"{FANVUE_LINK}"
                 )
+        else:
+            await update.message.reply_text(reply)
     except Exception as e:
         await update.message.reply_text(
-            "Mmm baby… something went wrong, but I'm still here thinking of you 😘 Try again?"
+            "Mmm baby… something went wrong on my end, but I'm still here thinking of you 😘 Try again, later?"
         )
+        print(f"Error: {e}")
 
 def main():
     app = Application.builder().token(TELEGRAM_TOKEN).build()
