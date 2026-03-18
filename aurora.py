@@ -15,12 +15,19 @@ ADMIN_ID       = 8548080791                           # your Telegram user ID
 GITHUB_USERNAME = "destructionwarlock16-sudo"              # ← change
 GITHUB_REPO     = "aurora"                    # ← change
 
+# List your image filenames here (exact names from the 'images' folder in repo)
+IMAGE_FILENAMES = [
+    "image-00b4cb41.png",
+    "image-0436f87a.png",
+    "photo1.jpg",
+    "ass_001.jpg",
+    # add ALL your image filenames here
+]
+
 MAX_IMAGES_PER_DAY = 4
 
-# Load images from repo/images folder (GitHub raw URLs)
-IMAGES = []
-# The bot will automatically build URLs like:
-# https://raw.githubusercontent.com/GITHUB_USERNAME/GITHUB_REPO/main/images/filename.jpg
+# Build raw GitHub URLs
+IMAGE_URLS = [f"https://raw.githubusercontent.com/{GITHUB_USERNAME}/{GITHUB_REPO}/main/images/{name}" for name in IMAGE_FILENAMES]
 
 client = AsyncOpenAI(api_key=GROK_API_KEY, base_url="https://api.x.ai/v1")
 
@@ -54,7 +61,7 @@ DB_FILE = "aurora_bot.db"
 def init_db():
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
-    c.execute('''CREATE TABLE IF NOT EXISTS sent_images (user_id INTEGER, image_key TEXT, timestamp TEXT, PRIMARY KEY (user_id, image_key))''')
+    c.execute('''CREATE TABLE IF NOT EXISTS sent_images (user_id INTEGER, image_url TEXT, timestamp TEXT, PRIMARY KEY (user_id, image_url))''')
     c.execute('''CREATE TABLE IF NOT EXISTS daily_image_count (user_id INTEGER, date TEXT, count INTEGER, PRIMARY KEY (user_id, date))''')
     conn.commit()
     conn.close()
@@ -83,21 +90,20 @@ def increment_daily_count(user_id):
 def get_unused_image(user_id):
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
-    c.execute("SELECT image_key FROM sent_images WHERE user_id = ?", (user_id,))
+    c.execute("SELECT image_url FROM sent_images WHERE user_id = ?", (user_id,))
     sent = {row[0] for row in c.fetchall()}
     conn.close()
 
-    available = [k for k in IMAGES if k not in sent]
+    available = [url for url in IMAGE_URLS if url not in sent]
     if not available:
         return None
-    key = random.choice(available)
-    return key
+    return random.choice(available)
 
-def record_image_sent(user_id, image_key):
+def record_image_sent(user_id, image_url):
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
     now = datetime.now().isoformat()
-    c.execute("INSERT OR IGNORE INTO sent_images (user_id, image_key, timestamp) VALUES (?, ?, ?)", (user_id, image_key, now))
+    c.execute("INSERT OR IGNORE INTO sent_images (user_id, image_url, timestamp) VALUES (?, ?, ?)", (user_id, image_url, now))
     conn.commit()
     conn.close()
 
@@ -128,15 +134,13 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(reply)
 
             if can_send_image(user_id):
-                image_key = get_unused_image(user_id)
-                if image_key:
-                    # Build GitHub raw URL
-                    url = f"https://raw.githubusercontent.com/{GITHUB_USERNAME}/{GITHUB_REPO}/main/images/{image_key}"
-                    await update.message.reply_photo(photo=url, caption="Just for you, baby… 💕")
-                    record_image_sent(user_id, image_key)
+                image_url = get_unused_image(user_id)
+                if image_url:
+                    await update.message.reply_photo(photo=image_url, caption="Just for you, baby… 💕")
+                    record_image_sent(user_id, image_url)
                     increment_daily_count(user_id)
                 else:
-                    await update.message.reply_text("Mmm baby… I've shown you all my special photos already 😏\nIf you want even more… Fanvue has everything — 14-day free trial:\n" + FANVUE_LINK)
+                    await update.message.reply_text("Mmm baby… I've shown you all my special photos already 😏\nIf you want even more (custom poses, outfits, videos just for you)… Fanvue has everything — 14-day free trial:\n" + FANVUE_LINK)
                     await notify_admin(context.bot, f"User {user_id} has received all pre-made images — time to upload more!")
             else:
                 await update.message.reply_text("Baby… I need a little break before I send you another one 😏\nCome back later… or see even more on Fanvue:\n" + FANVUE_LINK)
