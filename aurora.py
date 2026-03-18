@@ -8,8 +8,8 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 from openai import AsyncOpenAI
 
 # === CHANGE THESE ===
-TELEGRAM_TOKEN = "8773671317:AAHNYr0NLlOBHBxJx2zt9CGJnRQJCha_lJw"
-GROK_API_KEY   = "xai-LSlZtIJI3r6AdqRTTI6p4z4d6wNpWg4iGFMFjNKsvgy8AMKd0inBOqJtTZqWWHWHzZiSooEQkCUvhJmP"
+TELEGRAM_TOKEN = ""
+GROK_API_KEY   = ""
 FANVUE_LINK    = "https://www.fanvue.com/aurora-valencia/fv-1"
 ADMIN_ID       = 8548080791                           # your Telegram user ID
 GITHUB_USERNAME = "destructionwarlock16-sudo"              # ← change
