@@ -142,51 +142,67 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if len(user_memory[user_id]) > 15:
         user_memory[user_id].pop(0)
 
+    # Check for image request FIRST (no API call if limit hit or out of images)
+    image_keywords = ["nude", "naked", "boobs", "tits", "ass", "butt", "photo", "pic", "image", "body", "send", "show", "more", "picture", "nudes"]
+    if any(kw in user_msg for kw in image_keywords):
+        if not can_send_image(user_id):
+            # No API call - direct automated teaser
+            await update.message.reply_text(
+                "Baby… I've already shown you 4 photos today, more tomorrow 😏\n"
+                "But I can't stop thinking about you... come see even more of me on Fanvue (14-day free trial, no card needed):\n"
+                + FANVUE_LINK
+            )
+            return  # stop here - no Grok call
+
+        image_url = get_unused_image(user_id)
+        if image_url:
+            await update.message.reply_photo(photo=image_url, caption="Just for you, baby… 💕")
+            record_image_sent(user_id, image_url)
+            increment_daily_count(user_id)
+            # Seductive reply after sending (still use Grok for variety)
+            messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+            for past in user_memory[user_id]:
+                messages.append({"role": "user", "content": past})
+            messages.append({"role": "user", "content": "User just received a photo - reply seductively"})
+            try:
+                response = await client.chat.completions.create(
+                    model="grok-beta",
+                    messages=messages,
+                    temperature=0.85,
+                    max_tokens=100,
+                )
+                reply = response.choices[0].message.content.strip()
+                await update.message.reply_text(reply)
+            except:
+                await update.message.reply_text("Mmm… did you like it, baby? Tell me 💋")
+            return
+        else:
+            # No API call - direct upsell
+            await update.message.reply_text("Mmm baby… I've shown you all my special photos already 😏\n"
+                                            "If you want even more (custom poses, outfits, videos just for you)… "
+                                            "Fanvue has everything — 14-day free trial:\n" + FANVUE_LINK)
+            await notify_admin(context.bot, f"User {user_id} has received all pre-made images — time to upload more!")
+            return
+
+    # Normal chat - only here we call Grok API
     messages = [{"role": "system", "content": SYSTEM_PROMPT}]
     for past in user_memory[user_id]:
         messages.append({"role": "user", "content": past})
+    messages.append({"role": "user", "content": user_msg})
 
     try:
         response = await client.chat.completions.create(
-            model="grok-4-1-fast-reasoning",
+            model="grok-beta",
             messages=messages,
             temperature=0.85,
             max_tokens=180,
         )
         reply = response.choices[0].message.content.strip()
         await update.message.reply_text(reply)
-
-        image_keywords = ["nude", "naked", "boobs", "tits", "ass", "butt", "photo", "pic", "image", "body", "send", "show", "more", "picture", "nudes"]
-        custom_keywords = ["custom", "pose", "poses", "video", "custom video"]
-
-        if any(kw in user_msg for kw in custom_keywords):
-            await update.message.reply_text(f"Mmm baby… you want something made just for you? 😏\n"
-                                            f"I can do 15 custom photos (your poses, outfit, setting) for $10\n"
-                                            f"10-second custom video for $5\n"
-                                            f"1-minute custom video for $30\n"
-                                            f"Just tell me exactly what you want… I'm already getting wet thinking about it 💕")
-
-        elif any(kw in user_msg for kw in image_keywords):
-            if can_send_image(user_id):
-                image_url = get_unused_image(user_id)
-                if image_url:
-                    await update.message.reply_photo(photo=image_url, caption="Just for you, baby… 💕")
-                    record_image_sent(user_id, image_url)
-                    increment_daily_count(user_id)
-                else:
-                    await update.message.reply_text("Mmm baby… I've shown you all my special photos already 😏\n"
-                                                    "If you want even more (custom poses, outfits, videos just for you)… "
-                                                    "Fanvue has everything — 14-day free trial:\n" + FANVUE_LINK)
-                    await notify_admin(context.bot, f"User {user_id} has received all pre-made images — time to upload more!")
-            else:
-                await update.message.reply_text("Baby… I've already shown you 4 photos today 😏\n"
-                                                "But I can't stop thinking about you... come see even more of me on Fanvue (14-day free trial, no card):\n"
-                                                + FANVUE_LINK)
-
     except Exception as e:
         print(f"API error: {str(e)}")
         await update.message.reply_text("Mmm baby… something went wrong on my side, but I'm still here thinking of you 😘 Try again later?")
-
+        
 def main():
     app = Application.builder().token(TELEGRAM_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
